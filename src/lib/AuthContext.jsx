@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase, isConfigured } from './supabase.js';
 
 const AuthContext = createContext(null);
@@ -23,6 +23,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const profileFetchRef = useRef(0);
 
   const refreshProfile = useCallback(async () => {
     if (!supabase || !user?.id) {
@@ -46,14 +47,15 @@ export function AuthProvider({ children }) {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
-      setUser(session?.user ?? null);
-      if (session?.user?.id) {
-        const p = await fetchProfile(session.user.id);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      if (sessionUser?.id) {
+        const p = await fetchProfile(sessionUser.id);
         if (mounted) setProfile(p);
       } else {
         setProfile(null);
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     })();
 
     const {
@@ -61,13 +63,22 @@ export function AuthProvider({ children }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
       const nextUser = session?.user ?? null;
-      setUser(nextUser);
-      if (nextUser?.id) {
-        const p = await fetchProfile(nextUser.id);
-        if (mounted) setProfile(p);
-      } else {
+
+      if (!nextUser) {
+        setUser(null);
         setProfile(null);
+        setLoading(false);
+        return;
       }
+
+      const fetchId = ++profileFetchRef.current;
+      setUser(nextUser);
+      setLoading(true);
+
+      const p = await fetchProfile(nextUser.id);
+      if (!mounted || fetchId !== profileFetchRef.current) return;
+
+      setProfile(p);
       setLoading(false);
     });
 

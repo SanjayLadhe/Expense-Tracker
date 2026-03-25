@@ -1,5 +1,6 @@
-import { LayoutDashboard, Clock, BarChart3, Settings, Plus } from 'lucide-react';
+import { LayoutDashboard, Clock, BarChart3, Settings, Plus, ShieldCheck } from 'lucide-react';
 import { useApp } from '../lib/AppContext.jsx';
+import { useAuth } from '../lib/AuthContext.jsx';
 
 const tabs = [
   { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
@@ -8,8 +9,33 @@ const tabs = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
+function NavButton({ id, label, icon: TabIcon, activeTab, dispatch }) {
+  const active = activeTab === id;
+  return (
+    <button
+      key={id}
+      type="button"
+      onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: id })}
+      className={`flex min-w-[3.5rem] flex-1 flex-col items-center gap-0.5 pb-2 transition-all duration-200 ${
+        active
+          ? 'text-[#3B82F6]'
+          : 'dark:text-[#6B7280] text-gray-500'
+      }`}
+    >
+      <TabIcon className="size-5" strokeWidth={active ? 2.25 : 2} aria-hidden />
+      <span className="text-[10px] font-medium leading-none">{label}</span>
+    </button>
+  );
+}
+
 export default function BottomNav() {
   const { activeTab, dispatch } = useApp();
+  const { isAdmin } = useAuth();
+
+  const leftTabs = tabs.slice(0, 2);
+  const rightTabs = isAdmin
+    ? [...tabs.slice(2), { id: 'admin', label: 'Admin', icon: ShieldCheck }]
+    : tabs.slice(2);
 
   return (
     <nav
@@ -18,27 +44,11 @@ export default function BottomNav() {
       aria-label="Mobile navigation"
     >
       <div className="relative mx-auto flex max-w-lg items-end justify-between px-2 pt-2">
-        {tabs.slice(0, 2).map((tab) => {
-          const { id, label, icon: TabIcon } = tab;
-          const active = activeTab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: id })}
-              className={`flex min-w-[4rem] flex-1 flex-col items-center gap-0.5 pb-2 transition-all duration-200 ${
-                active
-                  ? 'text-[#3B82F6]'
-                  : 'dark:text-[#6B7280] text-gray-500'
-              }`}
-            >
-              <TabIcon className="size-6" strokeWidth={active ? 2.25 : 2} aria-hidden />
-              <span className="text-[10px] font-medium leading-none">{label}</span>
-            </button>
-          );
-        })}
+        {leftTabs.map((tab) => (
+          <NavButton key={tab.id} {...tab} activeTab={activeTab} dispatch={dispatch} />
+        ))}
 
-        <div className="relative flex w-16 shrink-0 flex-col items-center justify-end">
+        <div className="relative flex w-14 shrink-0 flex-col items-center justify-end">
           <button
             type="button"
             onClick={() => dispatch({ type: 'SET_SHOW_ADD_MODAL', payload: true })}
@@ -50,25 +60,9 @@ export default function BottomNav() {
           <span className="invisible pb-2 text-[10px] font-medium">Add</span>
         </div>
 
-        {tabs.slice(2).map((tab) => {
-          const { id, label, icon: TabIcon } = tab;
-          const active = activeTab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: id })}
-              className={`flex min-w-[4rem] flex-1 flex-col items-center gap-0.5 pb-2 transition-all duration-200 ${
-                active
-                  ? 'text-[#3B82F6]'
-                  : 'dark:text-[#6B7280] text-gray-500'
-              }`}
-            >
-              <TabIcon className="size-6" strokeWidth={active ? 2.25 : 2} aria-hidden />
-              <span className="text-[10px] font-medium leading-none">{label}</span>
-            </button>
-          );
-        })}
+        {rightTabs.map((tab) => (
+          <NavButton key={tab.id} {...tab} activeTab={activeTab} dispatch={dispatch} />
+        ))}
       </div>
     </nav>
   );

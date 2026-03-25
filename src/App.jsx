@@ -15,7 +15,7 @@ import { Loader2 } from 'lucide-react';
 
 function AuthLoading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0F1117]">
+    <div className="flex min-h-screen items-center justify-center dark:bg-[#0F1117] bg-[#F8FAFC]">
       <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
     </div>
   );
