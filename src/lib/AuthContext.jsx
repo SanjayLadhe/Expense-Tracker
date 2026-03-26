@@ -1,166 +1,120 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, isConfigured } from './supabase.js';
 
 const AuthContext = createContext(null);
 
 async function fetchProfile(userId) {
-  if (!supabase) return null;
-  const { data, error } = await supabase.rpc('get_my_profile');
-  if (error || !data || data.length === 0) {
-    const fallback = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (fallback.error) return null;
-    return fallback.data;
-  }
-  return data[0];
+  if (!supabase || !userId) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_my_profile');
+    if (!error && data && data.length > 0) return data[0];
+  } catch {}
+  try {
+    const { data, error } = await supabase
+      .from('profiles').select('*').eq('id', userId).single();
+    if (!error && data) return data;
+  } catch {}
+  return null;
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState(null);
-  const profileFetchRef = useRef(0);
+  const [state, setState] = useState({
+    user: null,
+    profile: null,
+    loading: true,
+    authError: null,
+  });
 
-  const refreshProfile = useCallback(async () => {
-    if (!supabase || !user?.id) {
-      setProfile(null);
+  const loadUserAndProfile = useCallback(async (sessionUser) => {
+    if (!sessionUser?.id) {
+      setState(s => ({ ...s, user: null, profile: null, loading: false }));
       return;
     }
-    const data = await fetchProfile(user.id);
-    setProfile(data);
-  }, [user?.id]);
+    setState(s => ({ ...s, user: sessionUser }));
+    const p = await fetchProfile(sessionUser.id);
+    setState(s => ({ ...s, user: sessionUser, profile: p, loading: false }));
+  }, []);
 
   useEffect(() => {
     if (!isConfigured || !supabase) {
-      setLoading(false);
-      setUser(null);
-      setProfile(null);
+      setState({ user: null, profile: null, loading: false, authError: null });
       return;
     }
 
     let mounted = true;
 
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
-      if (sessionUser?.id) {
-        const p = await fetchProfile(sessionUser.id);
-        if (mounted) setProfile(p);
-      } else {
-        setProfile(null);
-      }
-      if (mounted) setLoading(false);
-    })();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      const nextUser = session?.user ?? null;
-
-      if (!nextUser) {
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-
-      const fetchId = ++profileFetchRef.current;
-      setUser(nextUser);
-      setLoading(true);
-
-      const p = await fetchProfile(nextUser.id);
-      if (!mounted || fetchId !== profileFetchRef.current) return;
-
-      setProfile(p);
-      setLoading(false);
+      loadUserAndProfile(session?.user ?? null);
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!mounted) return;
+        if (_event === 'INITIAL_SESSION') return;
+        loadUserAndProfile(session?.user ?? null);
+      }
+    );
+
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, [loadUserAndProfile]);
+
+  const refreshProfile = useCallback(async () => {
+    if (!state.user?.id) { setState(s => ({ ...s, profile: null })); return; }
+    const p = await fetchProfile(state.user.id);
+    setState(s => ({ ...s, profile: p }));
+  }, [state.user?.id]);
+
+  const clearAuthError = useCallback(() => {
+    setState(s => ({ ...s, authError: null }));
   }, []);
 
-  const clearAuthError = useCallback(() => setAuthError(null), []);
-
   const signUp = useCallback(async (email, password, fullName) => {
-    if (!supabase) {
-      return { error: new Error('Supabase is not configured') };
-    }
-    setAuthError(null);
+    if (!supabase) return { error: new Error('Supabase is not configured') };
+    setState(s => ({ ...s, authError: null }));
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
+      email, password, options: { data: { full_name: fullName } },
     });
-    if (error) {
-      setAuthError(error.message);
-      return { error };
-    }
-    setAuthError(null);
+    if (error) { setState(s => ({ ...s, authError: error.message })); return { error }; }
     return { error: null };
   }, []);
 
   const signIn = useCallback(async (email, password) => {
-    if (!supabase) {
-      return { error: new Error('Supabase is not configured') };
+    if (!supabase) return { error: new Error('Supabase is not configured') };
+    setState(s => ({ ...s, authError: null, loading: true }));
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setState(s => ({ ...s, authError: error.message, loading: false }));
+      return { error };
     }
-    setAuthError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError(error.message);
-    return { error };
+    if (data?.user) {
+      const p = await fetchProfile(data.user.id);
+      setState(s => ({ ...s, user: data.user, profile: p, loading: false }));
+    } else {
+      setState(s => ({ ...s, loading: false }));
+    }
+    return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
-    if (!supabase) {
-      setUser(null);
-      setProfile(null);
-      setAuthError(null);
-      return;
-    }
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setAuthError(null);
+    if (supabase) await supabase.auth.signOut();
+    setState({ user: null, profile: null, loading: false, authError: null });
   }, []);
 
-  const isApproved = profile?.is_approved === true;
-  const isAdmin = profile?.is_admin === true;
+  const isApproved = state.profile?.is_approved === true;
+  const isAdmin = state.profile?.is_admin === true;
 
   const value = useMemo(
     () => ({
-      user,
-      profile,
-      loading,
-      authError,
+      user: state.user,
+      profile: state.profile,
+      loading: state.loading,
+      authError: state.authError,
       clearAuthError,
-      signUp,
-      signIn,
-      signOut,
-      refreshProfile,
-      isApproved,
-      isAdmin,
+      signUp, signIn, signOut, refreshProfile,
+      isApproved, isAdmin,
     }),
-    [
-      user,
-      profile,
-      loading,
-      authError,
-      clearAuthError,
-      signUp,
-      signIn,
-      signOut,
-      refreshProfile,
-      isApproved,
-      isAdmin,
-    ]
+    [state, clearAuthError, signUp, signIn, signOut, refreshProfile, isApproved, isAdmin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -168,8 +122,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }

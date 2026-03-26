@@ -77,7 +77,7 @@ function TabContent({ activeTab }) {
 }
 
 export default function App() {
-  const { user, loading: authLoading, isApproved, isAdmin } = useAuth();
+  const { user, profile, loading: authLoading, isApproved, isAdmin } = useAuth();
   const { loaded, activeTab, showAddModal, dispatch } = useApp();
 
   const closeModals = useCallback(() => {
@@ -123,6 +123,10 @@ export default function App() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (!profile) {
+    return <AuthLoading />;
   }
 
   if (!isApproved) {
