@@ -2,19 +2,35 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import { supabase, isConfigured } from './supabase.js';
 
 const AuthContext = createContext(null);
+const PROFILE_CACHE_KEY = 'et_profile_cache';
+
+function getCachedProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY)); } catch { return null; }
+}
+function setCachedProfile(p) {
+  try { if (p) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)); else localStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
 
 async function fetchProfile(userId) {
   if (!supabase || !userId) return null;
   try {
-    const { data, error } = await supabase.rpc('get_my_profile');
-    if (!error && data && data.length > 0) return data[0];
+    const { data, error } = await withTimeout(supabase.rpc('get_my_profile'), 8000);
+    if (!error && data && data.length > 0) { setCachedProfile(data[0]); return data[0]; }
   } catch {}
   try {
-    const { data, error } = await supabase
-      .from('profiles').select('*').eq('id', userId).single();
-    if (!error && data) return data;
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').select('*').eq('id', userId).single(), 8000
+    );
+    if (!error && data) { setCachedProfile(data); return data; }
   } catch {}
-  return null;
+  return getCachedProfile();
 }
 
 export function AuthProvider({ children }) {
@@ -27,12 +43,18 @@ export function AuthProvider({ children }) {
 
   const loadUserAndProfile = useCallback(async (sessionUser) => {
     if (!sessionUser?.id) {
+      setCachedProfile(null);
       setState(s => ({ ...s, user: null, profile: null, loading: false }));
       return;
     }
-    setState(s => ({ ...s, user: sessionUser }));
+    const cached = getCachedProfile();
+    if (cached && cached.id === sessionUser.id) {
+      setState(s => ({ ...s, user: sessionUser, profile: cached, loading: false }));
+    } else {
+      setState(s => ({ ...s, user: sessionUser }));
+    }
     const p = await fetchProfile(sessionUser.id);
-    setState(s => ({ ...s, user: sessionUser, profile: p, loading: false }));
+    setState(s => ({ ...s, user: sessionUser, profile: p ?? cached, loading: false }));
   }, []);
 
   useEffect(() => {
@@ -43,10 +65,19 @@ export function AuthProvider({ children }) {
 
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      loadUserAndProfile(session?.user ?? null);
-    });
+    withTimeout(supabase.auth.getSession(), 6000)
+      .then(({ data: { session } }) => {
+        if (mounted) loadUserAndProfile(session?.user ?? null);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        const cached = getCachedProfile();
+        if (cached) {
+          setState({ user: { id: cached.id }, profile: cached, loading: false, authError: null });
+        } else {
+          setState(s => ({ ...s, loading: false }));
+        }
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -65,9 +96,7 @@ export function AuthProvider({ children }) {
     setState(s => ({ ...s, profile: p }));
   }, [state.user?.id]);
 
-  const clearAuthError = useCallback(() => {
-    setState(s => ({ ...s, authError: null }));
-  }, []);
+  const clearAuthError = useCallback(() => setState(s => ({ ...s, authError: null })), []);
 
   const signUp = useCallback(async (email, password, fullName) => {
     if (!supabase) return { error: new Error('Supabase is not configured') };
@@ -97,6 +126,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    setCachedProfile(null);
     if (supabase) await supabase.auth.signOut();
     setState({ user: null, profile: null, loading: false, authError: null });
   }, []);
