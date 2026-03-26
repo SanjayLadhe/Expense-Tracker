@@ -146,19 +146,7 @@ export default function App() {
       <BottomNav />
       <Toast />
 
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            aria-label="Close"
-            onClick={closeModals}
-          />
-          <div className="absolute inset-x-0 bottom-0 max-h-[92vh] overflow-y-auto rounded-t-3xl border-t dark:border-[#2D3148] border-gray-200 dark:bg-[#222536] bg-white animate-slideUp">
-            <AddExpense />
-          </div>
-        </div>
-      )}
+      {showAddModal && <AddExpense />}
     </div>
   );
 }

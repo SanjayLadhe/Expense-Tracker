@@ -293,8 +293,8 @@ export function PendingApproval() {
   }, [refreshProfile]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0F1117] p-4">
-      <div className="w-full max-w-md rounded-2xl border border-[#2D3148] bg-[#1A1D28] p-8 text-center shadow-xl shadow-black/40">
+    <div className="flex min-h-screen items-center justify-center dark:bg-[#0F1117] bg-[#F8FAFC] p-4">
+      <div className="w-full max-w-md rounded-2xl border dark:border-[#2D3148] border-gray-200 dark:bg-[#1A1D28] bg-white p-8 text-center shadow-xl dark:shadow-black/40 shadow-gray-200/60">
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15 ring-2 ring-amber-500/25">
           <Clock className="h-8 w-8 text-amber-400" aria-hidden />
         </div>
@@ -393,12 +393,12 @@ export function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1117] p-4 md:p-8">
+    <div className="min-h-screen dark:bg-[#0F1117] bg-[#F8FAFC] p-4 pb-28 md:p-8 md:pb-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-[#F1F5F9]">Admin — Profiles</h2>
-            <p className="mt-1 text-sm text-slate-400">Approve users and manage roles</p>
+            <h2 className="text-2xl font-semibold dark:text-[#F1F5F9] text-gray-900">Admin — Profiles</h2>
+            <p className="mt-1 text-sm dark:text-slate-400 text-gray-500">Approve users and manage roles</p>
           </div>
           <button
             type="button"

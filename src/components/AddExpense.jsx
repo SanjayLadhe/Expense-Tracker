@@ -172,7 +172,11 @@ export default function AddExpense() {
       addExpense(payload);
       addToast('Expense saved!');
     }
-  }, [validate, editingExpense, addExpense, updateExpense, addToast]);
+    if (showAddModal) {
+      dispatch({ type: 'SET_SHOW_ADD_MODAL', payload: false });
+      dispatch({ type: 'SET_EDITING_EXPENSE', payload: null });
+    }
+  }, [validate, editingExpense, addExpense, updateExpense, addToast, showAddModal, dispatch]);
 
   const handleSaveAndAnother = useCallback(() => {
     if (editingExpense) return;
