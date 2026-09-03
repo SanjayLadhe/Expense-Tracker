@@ -483,7 +483,7 @@ export default function Budgets() {
 
   const setMonthlySalary = useCallback(
     (n) => {
-      const v = Math.max(0, Math.floor(Number(n) || 0));
+      const v = Math.max(0, Number(n) || 0);
       dispatch({ type: 'SET_SETTINGS', payload: { monthlySalary: v } });
       addToast(v ? 'Monthly salary updated' : 'Monthly salary cleared');
     },
@@ -660,7 +660,7 @@ export default function Budgets() {
               </span>
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 placeholder="0"
                 value={salaryDraft}
                 onChange={(e) => setSalaryDraft(e.target.value)}
@@ -680,7 +680,7 @@ export default function Budgets() {
             <span className="text-lg">{sym}</span>
             <input
               type="text"
-              inputMode="numeric"
+              inputMode="decimal"
               value={salaryEditValue}
               onChange={(e) => setSalaryEditValue(e.target.value)}
               className={`${inputClass} max-w-[200px]`}
@@ -688,7 +688,7 @@ export default function Budgets() {
             <button
               type="button"
               onClick={() => {
-                const v = Math.floor(Number(String(salaryEditValue).replace(/,/g, '')));
+                const v = Number(String(salaryEditValue).replace(/,/g, ''));
                 if (Number.isFinite(v) && v > 0) {
                   setMonthlySalary(v);
                   setEditingSalary(false);
