@@ -54,9 +54,13 @@ create table if not exists settings (
   currency        text default 'INR',
   theme           text default 'dark',
   monthly_budget  numeric(12,2) default 0,
+  monthly_salary  numeric(12,2) default 0,
   category_budgets jsonb default '{}'::jsonb,
   updated_at      timestamptz default now()
 );
+
+-- Existing installs: add the column if the table was created before this field existed.
+alter table settings add column if not exists monthly_salary numeric(12,2) default 0;
 
 -- ---------------------------------------------------------------------------
 -- 3. Custom categories

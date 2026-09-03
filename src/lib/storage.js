@@ -103,6 +103,7 @@ export const storage = {
       currency: data.currency ?? 'INR',
       theme: data.theme ?? 'dark',
       monthlyBudget: Number(data.monthly_budget) || 0,
+      monthlySalary: Number(data.monthly_salary) || 0,
       categoryBudgets: data.category_budgets ?? {},
     };
     writeLocal(SETTINGS_KEY, settings);
@@ -121,6 +122,7 @@ export const storage = {
         currency: settings.currency ?? 'INR',
         theme: settings.theme ?? 'dark',
         monthly_budget: settings.monthlyBudget ?? 0,
+        monthly_salary: settings.monthlySalary ?? 0,
         category_budgets: settings.categoryBudgets ?? {},
         updated_at: new Date().toISOString(),
       });

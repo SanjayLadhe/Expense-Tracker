@@ -395,6 +395,7 @@ export default function Budgets() {
   const currency = settings.currency ?? 'INR';
   const sym = CURRENCY_SYMBOLS[currency] ?? '₹';
   const monthlyBudget = Number(settings.monthlyBudget) || 0;
+  const monthlySalary = Number(settings.monthlySalary) || 0;
 
   const allCategories = useMemo(() => {
     const byId = new Map();
@@ -425,6 +426,13 @@ export default function Budgets() {
   const [budgetDraft, setBudgetDraft] = useState('');
   const [editingOverall, setEditingOverall] = useState(false);
   const [overallEditValue, setOverallEditValue] = useState('');
+
+  const [salaryDraft, setSalaryDraft] = useState('');
+  const [editingSalary, setEditingSalary] = useState(false);
+  const [salaryEditValue, setSalaryEditValue] = useState('');
+
+  const savingsThisMonth = monthlySalary > 0 ? monthlySalary - spent : null;
+  const salaryUsedPct = monthlySalary > 0 ? (spent / monthlySalary) * 100 : 0;
 
   const categoryBudgetsKey = useMemo(
     () => JSON.stringify(settings.categoryBudgets ?? {}),
@@ -471,6 +479,25 @@ export default function Budgets() {
     }
     setMonthlyBudget(v);
     setBudgetDraft('');
+  };
+
+  const setMonthlySalary = useCallback(
+    (n) => {
+      const v = Math.max(0, Math.floor(Number(n) || 0));
+      dispatch({ type: 'SET_SETTINGS', payload: { monthlySalary: v } });
+      addToast(v ? 'Monthly salary updated' : 'Monthly salary cleared');
+    },
+    [dispatch, addToast]
+  );
+
+  const handleSetSalary = () => {
+    const v = Number(String(salaryDraft).replace(/,/g, ''));
+    if (!Number.isFinite(v) || v <= 0) {
+      addToast('Enter a valid salary amount', 'error');
+      return;
+    }
+    setMonthlySalary(v);
+    setSalaryDraft('');
   };
 
   const goalActive = savingsGoal && Number(savingsGoal.targetAmount) > 0;
@@ -615,6 +642,119 @@ export default function Budgets() {
           ))}
         </div>
       )}
+
+      {/* Monthly salary / income */}
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold dark:text-[#F1F5F9] text-gray-900 mb-4">
+          Monthly salary
+        </h2>
+
+        {monthlySalary <= 0 ? (
+          <div className="space-y-4">
+            <p className="dark:text-gray-400 text-gray-600">
+              Add your monthly salary to track how much you save each month.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-medium dark:text-gray-300 text-gray-700">
+                {sym}
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={salaryDraft}
+                onChange={(e) => setSalaryDraft(e.target.value)}
+                className={`${inputClass} flex-1 text-2xl font-semibold`}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSetSalary}
+              className="w-full sm:w-auto rounded-xl bg-[#3B82F6] text-white font-medium px-6 py-3 hover:bg-blue-600 transition-colors"
+            >
+              Set Salary
+            </button>
+          </div>
+        ) : editingSalary ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-lg">{sym}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={salaryEditValue}
+              onChange={(e) => setSalaryEditValue(e.target.value)}
+              className={`${inputClass} max-w-[200px]`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const v = Math.floor(Number(String(salaryEditValue).replace(/,/g, '')));
+                if (Number.isFinite(v) && v > 0) {
+                  setMonthlySalary(v);
+                  setEditingSalary(false);
+                } else {
+                  addToast('Enter a valid amount', 'error');
+                }
+              }}
+              className="rounded-lg bg-[#3B82F6] text-white px-4 py-2 text-sm font-medium"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingSalary(false)}
+              className="rounded-lg border dark:border-[#2D3148] border-gray-300 px-4 py-2 text-sm dark:text-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="flex items-start justify-between gap-2 sm:col-span-1">
+              <div>
+                <p className="text-sm dark:text-gray-400 text-gray-600">Salary</p>
+                <p className="text-xl font-semibold dark:text-white text-gray-900 tabular-nums">
+                  {formatMoney(monthlySalary, currency)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSalaryEditValue(String(monthlySalary));
+                  setEditingSalary(true);
+                }}
+                className="p-2 rounded-lg border dark:border-[#2D3148] border-gray-200 dark:text-gray-300 text-gray-600 hover:bg-gray-50 dark:hover:bg-[#1A1D28]"
+                aria-label="Edit monthly salary"
+              >
+                <Pencil size={18} />
+              </button>
+            </div>
+            <div>
+              <p className="text-sm dark:text-gray-400 text-gray-600">Spent this month</p>
+              <p className="text-xl font-semibold dark:text-white text-gray-900 tabular-nums">
+                {formatMoney(spent, currency)}{' '}
+                <span className="text-sm font-normal dark:text-gray-400 text-gray-600">
+                  ({Math.round(salaryUsedPct)}% of salary)
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-sm dark:text-gray-400 text-gray-600">
+                {savingsThisMonth != null && savingsThisMonth < 0 ? 'Overspent by' : 'Saved so far'}
+              </p>
+              <p
+                className={`text-xl font-semibold tabular-nums ${
+                  savingsThisMonth != null && savingsThisMonth < 0
+                    ? 'text-red-500'
+                    : 'dark:text-emerald-400 text-emerald-600'
+                }`}
+              >
+                {formatMoney(Math.abs(savingsThisMonth ?? 0), currency)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Overall monthly budget */}

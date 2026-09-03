@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   currency: 'INR',
   theme: 'dark',
   monthlyBudget: 0,
+  monthlySalary: 0,
   categoryBudgets: {},
 };
 
