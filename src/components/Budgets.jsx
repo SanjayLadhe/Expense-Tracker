@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   Plus,
   Trash2,
@@ -13,6 +15,7 @@ import {
   getCategoryById,
   getCategoryColor,
 } from '../lib/categories.js';
+import { shiftMonth, monthLabel } from '../lib/month.js';
 import IconRenderer from './IconRenderer.jsx';
 
 const cardClass =
@@ -609,8 +612,39 @@ export default function Budgets() {
 
   const showOverallAlert = monthlyBudget > 0 && overallPct >= 80;
 
+  const goMonth = (delta) => {
+    dispatch({ type: 'SET_SELECTED_MONTH', payload: shiftMonth(selectedMonth, delta) });
+  };
+
   return (
     <div className="space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight dark:text-[#F1F5F9] text-gray-900">
+          Budgets
+        </h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => goMonth(-1)}
+            className="rounded-xl border border-gray-200 bg-white p-2 dark:border-[#2D3148] dark:bg-[#222536] dark:text-[#F1F5F9]"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <span className="min-w-[10rem] text-center text-sm font-medium dark:text-[#F1F5F9] text-gray-900">
+            {monthLabel(selectedMonth)}
+          </span>
+          <button
+            type="button"
+            onClick={() => goMonth(1)}
+            className="rounded-xl border border-gray-200 bg-white p-2 dark:border-[#2D3148] dark:bg-[#222536] dark:text-[#F1F5F9]"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      </header>
+
       {/* Monthly salary / income */}
       <div className={cardClass}>
         <h2 className="text-lg font-semibold dark:text-[#F1F5F9] text-gray-900 mb-4">

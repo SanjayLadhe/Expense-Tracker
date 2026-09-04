@@ -8,6 +8,7 @@ import {
   getCategoryById,
   getCategoryColor,
 } from '../lib/categories.js';
+import { shiftMonth, monthLabel } from '../lib/month.js';
 import IconRenderer from './IconRenderer.jsx';
 
 const cardClass =
@@ -40,20 +41,6 @@ function addDays(d, n) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
-}
-
-function shiftYearMonth(ym, delta) {
-  const [y, m] = ym.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(ym) {
-  const [y, m] = ym.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleString('en-IN', {
-    month: 'long',
-    year: 'numeric',
-  });
 }
 
 function daysInMonth(ym) {
@@ -243,7 +230,7 @@ export default function Dashboard() {
   ]);
 
   const goMonth = (delta) => {
-    dispatch({ type: 'SET_SELECTED_MONTH', payload: shiftYearMonth(selectedMonth, delta) });
+    dispatch({ type: 'SET_SELECTED_MONTH', payload: shiftMonth(selectedMonth, delta) });
   };
 
   const openExpense = (expense) => {
