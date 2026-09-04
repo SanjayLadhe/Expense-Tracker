@@ -611,38 +611,6 @@ export default function Budgets() {
 
   return (
     <div className="space-y-6">
-      {(showOverallAlert || categoryAlerts.length > 0) && (
-        <div className="space-y-3">
-          {showOverallAlert && (
-            <AlertBanner
-              severity={overallSeverity === 'over' ? 'over' : 'high'}
-              title={
-                overallPct > 100
-                  ? 'Over monthly budget'
-                  : 'Monthly budget warning'
-              }
-              body={
-                overallPct > 100
-                  ? `You've spent ${formatMoney(spent, currency)} of ${formatMoney(monthlyBudget, currency)} (${Math.round(overallPct)}%).`
-                  : `You've used about ${Math.round(overallPct)}% of your monthly budget (${formatMoney(spent, currency)} of ${formatMoney(monthlyBudget, currency)}).`
-              }
-            />
-          )}
-          {categoryAlerts.map((a) => (
-            <AlertBanner
-              key={a.id}
-              severity={a.severity}
-              title={
-                a.pct > 100
-                  ? `${a.name} is over budget`
-                  : `${a.name} nearing budget limit`
-              }
-              body={`Spent ${formatMoney(a.spent, currency)} of ${formatMoney(a.cap, currency)} (${Math.round(a.pct)}%).`}
-            />
-          ))}
-        </div>
-      )}
-
       {/* Monthly salary / income */}
       <div className={cardClass}>
         <h2 className="text-lg font-semibold dark:text-[#F1F5F9] text-gray-900 mb-4">
@@ -755,6 +723,38 @@ export default function Budgets() {
           </div>
         )}
       </div>
+
+      {(showOverallAlert || categoryAlerts.length > 0) && (
+        <div className="space-y-3">
+          {showOverallAlert && (
+            <AlertBanner
+              severity={overallSeverity === 'over' ? 'over' : 'high'}
+              title={
+                overallPct > 100
+                  ? 'Over monthly budget'
+                  : 'Monthly budget warning'
+              }
+              body={
+                overallPct > 100
+                  ? `You've spent ${formatMoney(spent, currency)} of ${formatMoney(monthlyBudget, currency)} (${Math.round(overallPct)}%).`
+                  : `You've used about ${Math.round(overallPct)}% of your monthly budget (${formatMoney(spent, currency)} of ${formatMoney(monthlyBudget, currency)}).`
+              }
+            />
+          )}
+          {categoryAlerts.map((a) => (
+            <AlertBanner
+              key={a.id}
+              severity={a.severity}
+              title={
+                a.pct > 100
+                  ? `${a.name} is over budget`
+                  : `${a.name} nearing budget limit`
+              }
+              body={`Spent ${formatMoney(a.spent, currency)} of ${formatMoney(a.cap, currency)} (${Math.round(a.pct)}%).`}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Overall monthly budget */}
