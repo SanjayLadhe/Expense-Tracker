@@ -9,6 +9,13 @@
 --
 -- After creating your first account, run this to make yourself admin:
 -- UPDATE profiles SET is_approved = true, is_admin = true WHERE email = 'your@email.com';
+--
+-- SECURITY: this file is safe to re-run in full against an existing project —
+-- table/column creation is guarded with "if not exists" and every RLS policy
+-- is dropped and recreated. If your project predates the is_approved() check
+-- below, re-run this whole file so pending (unapproved) accounts can no
+-- longer read or write data straight through supabase-js, bypassing the
+-- app's client-side approval screen.
 -- ============================================================
 
 -- ---------------------------------------------------------------------------
@@ -101,6 +108,22 @@ stable
 as $$
   select coalesce(
     (select is_admin from public.profiles where id = auth.uid()),
+    false
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Helper: check if the current caller's profile is approved (SECURITY DEFINER bypasses RLS)
+-- ---------------------------------------------------------------------------
+create or replace function public.is_approved()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce(
+    (select is_approved from public.profiles where id = auth.uid()),
     false
   );
 $$;
@@ -208,18 +231,24 @@ alter table custom_categories enable row level security;
 alter table savings_goal enable row level security;
 
 -- profiles: every authenticated user can read their own row
+-- (kept approval-agnostic on purpose — App.jsx needs to read is_approved
+-- itself to render the "pending approval" screen)
+drop policy if exists "profiles_select_own" on profiles;
 create policy "profiles_select_own"
   on profiles for select
   to authenticated
   using (id = auth.uid());
 
 -- profiles: admins can read ALL rows (uses SECURITY DEFINER helper to avoid recursion)
+drop policy if exists "profiles_select_admin" on profiles;
 create policy "profiles_select_admin"
   on profiles for select
   to authenticated
   using (public.is_admin());
 
--- profiles: users update own row
+-- profiles: users update own row (is_approved/is_admin themselves are still
+-- locked down by the profiles_prevent_privileged_field_changes trigger)
+drop policy if exists "profiles_update_own" on profiles;
 create policy "profiles_update_own"
   on profiles for update
   to authenticated
@@ -227,6 +256,7 @@ create policy "profiles_update_own"
   with check (id = auth.uid());
 
 -- profiles: admins update any row
+drop policy if exists "profiles_update_admin" on profiles;
 create policy "profiles_update_admin"
   on profiles for update
   to authenticated
@@ -234,79 +264,96 @@ create policy "profiles_update_admin"
   with check (true);
 
 -- expenses
+-- Approval is required in addition to ownership: is_approved() (or is_admin())
+-- must pass, or an unapproved-but-authenticated user could read/write data
+-- straight through supabase-js, bypassing the app's client-side approval gate.
+drop policy if exists "expenses_select_own" on expenses;
 create policy "expenses_select_own"
   on expenses for select
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "expenses_insert_own" on expenses;
 create policy "expenses_insert_own"
   on expenses for insert
   to authenticated
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "expenses_update_own" on expenses;
 create policy "expenses_update_own"
   on expenses for update
   to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()))
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "expenses_delete_own" on expenses;
 create policy "expenses_delete_own"
   on expenses for delete
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
 -- custom_categories
+drop policy if exists "custom_categories_select_own" on custom_categories;
 create policy "custom_categories_select_own"
   on custom_categories for select
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "custom_categories_insert_own" on custom_categories;
 create policy "custom_categories_insert_own"
   on custom_categories for insert
   to authenticated
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "custom_categories_update_own" on custom_categories;
 create policy "custom_categories_update_own"
   on custom_categories for update
   to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()))
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "custom_categories_delete_own" on custom_categories;
 create policy "custom_categories_delete_own"
   on custom_categories for delete
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
 -- settings (read / upsert own row)
+drop policy if exists "settings_select_own" on settings;
 create policy "settings_select_own"
   on settings for select
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "settings_insert_own" on settings;
 create policy "settings_insert_own"
   on settings for insert
   to authenticated
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "settings_update_own" on settings;
 create policy "settings_update_own"
   on settings for update
   to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()))
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
 -- savings_goal (read / upsert own row)
+drop policy if exists "savings_goal_select_own" on savings_goal;
 create policy "savings_goal_select_own"
   on savings_goal for select
   to authenticated
-  using (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "savings_goal_insert_own" on savings_goal;
 create policy "savings_goal_insert_own"
   on savings_goal for insert
   to authenticated
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
 
+drop policy if exists "savings_goal_update_own" on savings_goal;
 create policy "savings_goal_update_own"
   on savings_goal for update
   to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = auth.uid() and (public.is_approved() or public.is_admin()))
+  with check (user_id = auth.uid() and (public.is_approved() or public.is_admin()));
