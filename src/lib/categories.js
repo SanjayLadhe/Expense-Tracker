@@ -160,3 +160,67 @@ export function getCategoryColor(id) {
   const cat = getCategoryById(id);
   return cat?.color ?? "#9CA3AF";
 }
+
+// Custom entries sharing an id with a default category only add extra
+// sub-categories to it (so defaults can be extended and persisted).
+export function mergeCategories(customCategories = []) {
+  const extras = new Map(
+    customCategories.filter((c) => getCategoryById(c.id)).map((c) => [c.id, c.subCategories || []]),
+  );
+  const defaults = DEFAULT_CATEGORIES.map((c) => {
+    const more = (extras.get(c.id) || []).filter((s) => !c.subCategories.includes(s));
+    return more.length ? { ...c, subCategories: [...c.subCategories, ...more] } : c;
+  });
+  return [...defaults, ...customCategories.filter((c) => !getCategoryById(c.id))];
+}
+
+// Safe evaluator for "120+80*2" style input (no eval). Returns null if invalid.
+export function evaluateExpression(input) {
+  const s = String(input ?? '').replace(/,/g, '').replace(/[×x]/gi, '*').replace(/÷/g, '/').replace(/\s+/g, '');
+  if (!s || !/^[\d.+\-*/()]+$/.test(s)) return null;
+  let i = 0;
+  const peek = () => s[i];
+  const num = () => {
+    const m = /^\d*\.?\d+|^\d+\./.exec(s.slice(i));
+    if (!m) throw new Error('num');
+    i += m[0].length;
+    return parseFloat(m[0]);
+  };
+  const factor = () => {
+    if (peek() === '-') { i++; return -factor(); }
+    if (peek() === '+') { i++; return factor(); }
+    if (peek() === '(') {
+      i++;
+      const v = expr();
+      if (peek() !== ')') throw new Error('paren');
+      i++;
+      return v;
+    }
+    return num();
+  };
+  const term = () => {
+    let v = factor();
+    while (peek() === '*' || peek() === '/') {
+      const op = s[i++];
+      const r = factor();
+      v = op === '*' ? v * r : v / r;
+    }
+    return v;
+  };
+  const expr = () => {
+    let v = term();
+    while (peek() === '+' || peek() === '-') {
+      const op = s[i++];
+      const r = term();
+      v = op === '+' ? v + r : v - r;
+    }
+    return v;
+  };
+  try {
+    const v = expr();
+    if (i !== s.length || !Number.isFinite(v)) return null;
+    return Math.round(v * 100) / 100;
+  } catch {
+    return null;
+  }
+}

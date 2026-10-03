@@ -17,7 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext.jsx';
-import { DEFAULT_CATEGORIES, CURRENCY_SYMBOLS, PAYMENT_MODES } from '../lib/categories.js';
+import { DEFAULT_CATEGORIES, CURRENCY_SYMBOLS, PAYMENT_MODES, mergeCategories } from '../lib/categories.js';
 import { storage } from '../lib/storage.js';
 import IconRenderer from './IconRenderer.jsx';
 
@@ -399,10 +399,7 @@ export default function SettingsPage() {
   const [catSubs, setCatSubs] = useState([]);
   const [catSubInput, setCatSubInput] = useState('');
 
-  const allCategories = useMemo(
-    () => [...DEFAULT_CATEGORIES, ...customCategories],
-    [customCategories],
-  );
+  const allCategories = useMemo(() => mergeCategories(customCategories), [customCategories]);
 
   const todayStamp = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
