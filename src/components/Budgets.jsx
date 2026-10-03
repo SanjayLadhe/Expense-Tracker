@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext.jsx';
 import {
-  DEFAULT_CATEGORIES,
+  mergeCategories,
   CURRENCY_SYMBOLS,
   getCategoryById,
   getCategoryColor,
@@ -401,10 +401,7 @@ export default function Budgets() {
   const monthlySalary = Number(settings.monthlySalary) || 0;
 
   const allCategories = useMemo(() => {
-    const byId = new Map();
-    for (const c of DEFAULT_CATEGORIES) byId.set(c.id, c);
-    for (const c of customCategories || []) byId.set(c.id, c);
-    return [...byId.values()];
+    return mergeCategories(customCategories || []);
   }, [customCategories]);
 
   const spent = getTotalForMonth(selectedMonth);

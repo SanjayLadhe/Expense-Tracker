@@ -115,7 +115,14 @@ export default function Dashboard() {
 
   const currency = settings.currency ?? 'INR';
   const sym = CURRENCY_SYMBOLS[currency] ?? currency + ' ';
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayLabel = now.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
   const yesterday = prevDayYmd(today);
 
   const dashboardStats = useMemo(() => {
@@ -279,7 +286,10 @@ export default function Dashboard() {
       </header>
 
       <section className={cardClass}>
-        <p className={`text-sm font-medium ${textSecondary}`}>Today&apos;s Spending</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className={`text-sm font-medium ${textSecondary}`}>Today&apos;s Spending</p>
+          <p className={`text-sm font-medium ${textSecondary}`}>{todayLabel}</p>
+        </div>
         <p
           className={`mt-1 text-4xl font-bold tabular-nums ${textPrimary} animate-countUp`}
         >

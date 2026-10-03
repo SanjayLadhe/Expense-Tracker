@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, Filter, Trash2, ChevronDown, Receipt } from 'lucide-react';
 import { useApp } from '../lib/AppContext.jsx';
 import {
-  DEFAULT_CATEGORIES,
+  mergeCategories,
   PAYMENT_MODES,
   CURRENCY_SYMBOLS,
   getCategoryById,
@@ -456,12 +456,7 @@ export default function History() {
               }
             >
               <option value="">All categories</option>
-              {DEFAULT_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-              {(customCategories ?? []).map((c) => (
+              {mergeCategories(customCategories ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>

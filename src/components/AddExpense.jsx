@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Plus, Check } from 'lucide-react';
 import { useApp } from '../lib/AppContext.jsx';
-import { DEFAULT_CATEGORIES, PAYMENT_MODES, CURRENCY_SYMBOLS } from '../lib/categories.js';
+import {
+  DEFAULT_CATEGORIES,
+  PAYMENT_MODES,
+  CURRENCY_SYMBOLS,
+  mergeCategories,
+  evaluateExpression,
+} from '../lib/categories.js';
 import IconRenderer from './IconRenderer.jsx';
 
 function todayISO() {
@@ -28,6 +34,9 @@ function useIsMobile() {
   return mobile;
 }
 
+const CAT_COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#EC4899', '#EF4444', '#14B8A6', '#F59E0B', '#22C55E'];
+const CAT_ICONS = ['Tag', 'Sparkles', 'Heart', 'Home', 'Car', 'ShoppingCart', 'Briefcase', 'BookOpen'];
+
 export default function AddExpense() {
   const {
     settings,
@@ -44,10 +53,14 @@ export default function AddExpense() {
   const isMobile = useIsMobile();
   const useOverlay = isMobile && showAddModal && activeTab !== 'add';
 
-  const allCategories = useMemo(
-    () => [...DEFAULT_CATEGORIES, ...customCategories],
-    [customCategories],
-  );
+  const allCategories = useMemo(() => mergeCategories(customCategories), [customCategories]);
+
+  const [newCatOpen, setNewCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState(CAT_COLORS[0]);
+  const [newCatIcon, setNewCatIcon] = useState(CAT_ICONS[0]);
+  const [newSub, setNewSub] = useState('');
+  const [addingSub, setAddingSub] = useState(false);
 
   const currencySymbol = CURRENCY_SYMBOLS[settings.currency] ?? CURRENCY_SYMBOLS.INR ?? '₹';
 
@@ -116,7 +129,7 @@ export default function AddExpense() {
   );
 
   const buildExpensePayload = useCallback(() => {
-    const num = parseFloat(String(amount).replace(/,/g, ''));
+    const num = evaluateExpression(amount) ?? NaN;
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
@@ -196,11 +209,75 @@ export default function AddExpense() {
     dispatch({ type: 'SET_SHOW_ADD_MODAL', payload: false });
   }, [dispatch]);
 
+  const amountResult = useMemo(() => evaluateExpression(amount), [amount]);
+  const amountIsExpression = /[+\-*/×÷x()]/i.test(String(amount).replace(/^-/, ''));
+
+  const applyAmountResult = () => {
+    if (amountResult != null) setAmount(String(amountResult));
+  };
+
   const onAmountKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === '=') {
       e.preventDefault();
-      firstCategoryRef.current?.focus();
+      if (amountIsExpression && amountResult != null) {
+        applyAmountResult();
+      } else if (e.key === 'Enter') {
+        firstCategoryRef.current?.focus();
+      }
     }
+  };
+
+  const saveNewCategory = () => {
+    const name = newCatName.trim();
+    if (!name) {
+      addToast('Enter a category name', 'error');
+      return;
+    }
+    if (allCategories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      addToast('A category with this name already exists', 'error');
+      return;
+    }
+    const id = `custom-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+    dispatch({
+      type: 'SET_CUSTOM_CATEGORIES',
+      payload: [
+        ...customCategories,
+        { id, name, icon: newCatIcon, color: newCatColor, subCategories: [] },
+      ],
+    });
+    setCategoryId(id);
+    setSubCategory('');
+    setNewCatName('');
+    setNewCatOpen(false);
+    addToast('Category added');
+  };
+
+  const saveNewSub = () => {
+    const name = newSub.trim();
+    if (!name || !selectedCategory) return;
+    if ((selectedCategory.subCategories || []).some((s) => s.toLowerCase() === name.toLowerCase())) {
+      setSubCategory((selectedCategory.subCategories || []).find((s) => s.toLowerCase() === name.toLowerCase()));
+    } else {
+      const existing = customCategories.find((c) => c.id === selectedCategory.id);
+      const payload = existing
+        ? customCategories.map((c) =>
+            c.id === existing.id ? { ...c, subCategories: [...(c.subCategories || []), name] } : c,
+          )
+        : [
+            ...customCategories,
+            {
+              id: selectedCategory.id,
+              name: selectedCategory.name,
+              icon: selectedCategory.icon,
+              color: selectedCategory.color,
+              subCategories: [name],
+            },
+          ];
+      dispatch({ type: 'SET_CUSTOM_CATEGORIES', payload });
+      setSubCategory(name);
+    }
+    setNewSub('');
+    setAddingSub(false);
   };
 
   const formBody = (
@@ -213,18 +290,49 @@ export default function AddExpense() {
           </span>
           <input
             ref={amountRef}
-            type="number"
+            type="text"
             inputMode="decimal"
-            min={0}
-            step="any"
             placeholder="0"
             autoFocus
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => setAmount(e.target.value.replace(/[^\d.+\-*/×÷()xX,\s]/g, ''))}
             onKeyDown={onAmountKeyDown}
-            className="dark:bg-[#1A1D28] bg-gray-50 dark:border-[#2D3148] border-gray-300 dark:text-[#F1F5F9] text-gray-900 rounded-xl px-2 py-3 border outline-none focus:ring-2 focus:ring-[#3B82F6] transition-all text-4xl font-semibold text-center flex-1 min-w-0 max-w-[12ch]"
+            className="dark:bg-[#1A1D28] bg-gray-50 dark:border-[#2D3148] border-gray-300 dark:text-[#F1F5F9] text-gray-900 rounded-xl px-2 py-3 border outline-none focus:ring-2 focus:ring-[#3B82F6] transition-all text-4xl font-semibold text-center flex-1 min-w-0 max-w-[16ch]"
           />
         </div>
+        <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+          {['+', '-', '×', '÷'].map((op) => (
+            <button
+              key={op}
+              type="button"
+              onClick={() => {
+                setAmount((a) => (a ? a + op : a));
+                amountRef.current?.focus();
+              }}
+              className="h-9 w-11 rounded-lg border dark:border-[#2D3148] border-gray-300 dark:text-[#F1F5F9] text-gray-800 text-lg dark:hover:bg-[#2A2E42] hover:bg-gray-100"
+              aria-label={`Insert ${op}`}
+            >
+              {op}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={applyAmountResult}
+            disabled={!amountIsExpression || amountResult == null}
+            className="h-9 px-3 rounded-lg bg-[#3B82F6] text-white font-semibold disabled:opacity-40"
+          >
+            = Sum
+          </button>
+        </div>
+        {amountIsExpression && (
+          <p className="text-sm dark:text-[#9CA3AF] text-gray-500 mt-1">
+            {amountResult != null ? (
+              <>Total: <span className="font-semibold dark:text-[#F1F5F9] text-gray-900">{currencySymbol}{amountResult}</span></>
+            ) : (
+              'Incomplete expression'
+            )}
+          </p>
+        )}
       </div>
 
       <div>
@@ -264,7 +372,60 @@ export default function AddExpense() {
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setNewCatOpen((v) => !v)}
+            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed p-3 dark:border-[#2D3148] border-gray-300 text-[#3B82F6] hover:border-[#3B82F6]"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#3B82F6]/15">
+              <Plus size={22} />
+            </span>
+            <span className="text-xs font-medium">New category</span>
+          </button>
         </div>
+        {newCatOpen && (
+          <div className="mt-3 flex flex-col gap-3 rounded-2xl border p-3 dark:border-[#2D3148] border-gray-200 dark:bg-[#1A1D28] bg-gray-50">
+            <input
+              type="text"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), saveNewCategory())}
+              placeholder="Category name"
+              className="w-full dark:bg-[#222536] bg-white dark:border-[#2D3148] border-gray-300 dark:text-[#F1F5F9] text-gray-900 rounded-xl px-4 py-2.5 border outline-none focus:ring-2 focus:ring-[#3B82F6]"
+            />
+            <div className="flex flex-wrap gap-2">
+              {CAT_ICONS.map((ic) => (
+                <button
+                  key={ic}
+                  type="button"
+                  onClick={() => setNewCatIcon(ic)}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg border ${newCatIcon === ic ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]' : 'dark:border-[#2D3148] border-gray-300'}`}
+                >
+                  <IconRenderer name={ic} size={18} style={{ color: newCatColor }} />
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {CAT_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`Color ${c}`}
+                  onClick={() => setNewCatColor(c)}
+                  className={`h-7 w-7 rounded-full ${newCatColor === c ? 'ring-2 ring-offset-2 ring-[#3B82F6] dark:ring-offset-[#1A1D28]' : ''}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={saveNewCategory}
+              className="self-start inline-flex items-center gap-1.5 rounded-xl bg-[#3B82F6] px-4 py-2 text-sm font-semibold text-white"
+            >
+              <Check size={16} /> Add category
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedCategory && (
@@ -291,6 +452,30 @@ export default function AddExpense() {
               </option>
             ))}
           </select>
+          {addingSub ? (
+            <div className="mt-2 flex gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={newSub}
+                onChange={(e) => setNewSub(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), saveNewSub())}
+                placeholder="New sub-category"
+                className="flex-1 min-w-0 dark:bg-[#1A1D28] bg-gray-50 dark:border-[#2D3148] border-gray-300 dark:text-[#F1F5F9] text-gray-900 rounded-xl px-4 py-2.5 border outline-none focus:ring-2 focus:ring-[#3B82F6]"
+              />
+              <button type="button" onClick={saveNewSub} className="rounded-xl bg-[#3B82F6] px-4 text-sm font-semibold text-white">
+                Add
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingSub(true)}
+              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[#3B82F6]"
+            >
+              <Plus size={16} /> Add sub-category
+            </button>
+          )}
         </div>
       )}
 
