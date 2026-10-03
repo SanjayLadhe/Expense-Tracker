@@ -17,7 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useApp } from '../lib/AppContext.jsx';
-import { DEFAULT_CATEGORIES, CURRENCY_SYMBOLS, PAYMENT_MODES, mergeCategories } from '../lib/categories.js';
+import { DEFAULT_CATEGORIES, CURRENCY_SYMBOLS, PAYMENT_MODES, mergeCategories, buildOverride, HIDDEN_MARK } from '../lib/categories.js';
 import { storage } from '../lib/storage.js';
 import IconRenderer from './IconRenderer.jsx';
 
@@ -445,11 +445,11 @@ export default function SettingsPage() {
       return;
     }
     if (editingCategoryId) {
-      const next = customCategories.map((c) =>
-        c.id === editingCategoryId
-          ? { ...c, name, icon: catIcon, color: catColor, subCategories: catSubs }
-          : c,
-      );
+      const edited = { id: editingCategoryId, name, icon: catIcon, color: catColor, subCategories: catSubs };
+      const entry = DEFAULT_CATEGORY_IDS.has(editingCategoryId) ? buildOverride(edited) : edited;
+      const next = customCategories.some((c) => c.id === editingCategoryId)
+        ? customCategories.map((c) => (c.id === editingCategoryId ? { ...c, ...entry } : c))
+        : [...customCategories, entry];
       dispatch({ type: 'SET_CUSTOM_CATEGORIES', payload: next });
       addToast('Category updated');
     } else {
@@ -465,11 +465,15 @@ export default function SettingsPage() {
   };
 
   const deleteCustomCategory = (id) => {
+    const rest = customCategories.filter((c) => c.id !== id);
+    const def = DEFAULT_CATEGORIES.find((c) => c.id === id);
     dispatch({
       type: 'SET_CUSTOM_CATEGORIES',
-      payload: customCategories.filter((c) => c.id !== id),
+      payload: def
+        ? [...rest, { id, name: def.name, icon: def.icon, color: def.color, subCategories: [HIDDEN_MARK] }]
+        : rest,
     });
-    addToast('Category removed');
+    addToast(def ? 'Category hidden (past expenses are kept)' : 'Category removed');
     if (editingCategoryId === id) {
       resetCategoryForm();
       setCategoryFormOpen(false);
@@ -704,7 +708,7 @@ export default function SettingsPage() {
                       {subCount} subcategor{subCount === 1 ? 'y' : 'ies'}
                     </p>
                   </div>
-                  {!isDefault && (
+                  {(
                     <div className="flex gap-1">
                       <button
                         type="button"
@@ -744,7 +748,7 @@ export default function SettingsPage() {
             >
               <span className="flex items-center gap-2">
                 <Plus className="size-4 text-[#3B82F6]" aria-hidden />
-                {editingCategoryId ? 'Edit custom category' : 'Add custom category'}
+                {editingCategoryId ? 'Edit category' : 'Add custom category'}
               </span>
               <ChevronDown
                 className={`size-4 transition-transform dark:text-[#9CA3AF] ${categoryFormOpen ? 'rotate-180' : ''}`}

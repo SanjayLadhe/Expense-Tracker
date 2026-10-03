@@ -19,6 +19,7 @@ import {
 import { useApp } from '../lib/AppContext.jsx';
 import {
   DEFAULT_CATEGORIES,
+  mergeCategories,
   PAYMENT_MODES,
   CURRENCY_SYMBOLS,
   getCategoryById,
@@ -187,7 +188,7 @@ export default function Analytics() {
   );
 
   const allCategoryOptions = useMemo(() => {
-    const byId = new Map(DEFAULT_CATEGORIES.map((c) => [c.id, c]));
+    const byId = new Map(mergeCategories(customCategories ?? []).map((c) => [c.id, c]));
     for (const c of customCategories ?? []) {
       if (c?.id && !byId.has(c.id)) {
         byId.set(c.id, resolveCategory(c.id, customCategories));

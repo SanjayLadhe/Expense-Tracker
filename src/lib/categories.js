@@ -161,17 +161,52 @@ export function getCategoryColor(id) {
   return cat?.color ?? "#9CA3AF";
 }
 
-// Custom entries sharing an id with a default category only add extra
-// sub-categories to it (so defaults can be extended and persisted).
+// A custom entry sharing an id with a default category is an override of it:
+//   name/icon/color  -> replace the default's look
+//   subCategories    -> extra subs; "-:Name" hides a default sub, "!hidden" hides the category
+export const HIDDEN_MARK = '!hidden';
+
 export function mergeCategories(customCategories = []) {
-  const extras = new Map(
-    customCategories.filter((c) => getCategoryById(c.id)).map((c) => [c.id, c.subCategories || []]),
+  const overrides = new Map(
+    customCategories.filter((c) => getCategoryById(c.id)).map((c) => [c.id, c]),
   );
-  const defaults = DEFAULT_CATEGORIES.map((c) => {
-    const more = (extras.get(c.id) || []).filter((s) => !c.subCategories.includes(s));
-    return more.length ? { ...c, subCategories: [...c.subCategories, ...more] } : c;
-  });
+  const defaults = [];
+  for (const c of DEFAULT_CATEGORIES) {
+    const ov = overrides.get(c.id);
+    if (!ov) {
+      defaults.push(c);
+      continue;
+    }
+    const marks = ov.subCategories || [];
+    if (marks.includes(HIDDEN_MARK)) continue;
+    const hidden = new Set(marks.filter((s) => s.startsWith('-:')).map((s) => s.slice(2)));
+    const extras = marks.filter((s) => !s.startsWith('-:') && s !== HIDDEN_MARK);
+    const subs = c.subCategories.filter((s) => !hidden.has(s));
+    defaults.push({
+      ...c,
+      name: ov.name || c.name,
+      icon: ov.icon || c.icon,
+      color: ov.color || c.color,
+      subCategories: [...subs, ...extras.filter((s) => !subs.includes(s))],
+    });
+  }
   return [...defaults, ...customCategories.filter((c) => !getCategoryById(c.id))];
+}
+
+// Build the stored override for a default category from the edited result.
+export function buildOverride(edited) {
+  const def = getCategoryById(edited.id);
+  const subs = edited.subCategories || [];
+  return {
+    id: edited.id,
+    name: edited.name,
+    icon: edited.icon,
+    color: edited.color,
+    subCategories: [
+      ...def.subCategories.filter((s) => !subs.includes(s)).map((s) => `-:${s}`),
+      ...subs.filter((s) => !def.subCategories.includes(s)),
+    ],
+  };
 }
 
 // Safe evaluator for "120+80*2" style input (no eval). Returns null if invalid.
